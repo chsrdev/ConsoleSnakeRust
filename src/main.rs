@@ -7,7 +7,6 @@ use crossterm::event::{poll, read, Event, KeyCode};
 use crossterm::style::{SetForegroundColor, ResetColor, Color};
 use rand::Rng;
 
-// ^ < ˅ >
 struct Direction {
     x: i8,
     y: i8,
@@ -33,7 +32,7 @@ fn main() {
 
     let mut direction: Direction = DIRECTION_RIGHT;
     let mut fruit = generate_fruit(&snake, width, height);
-    dbg!(fruit);
+    let mut points = 0;
 
     queue!(stdout, Clear(ClearType::All)).unwrap();
     draw_snake(&snake, &direction, &mut stdout);
@@ -63,6 +62,7 @@ fn main() {
         }
 
         queue!(stdout, Clear(ClearType::All)).unwrap();
+        write_points(width, points, &mut stdout);
 
         let snake_move_result = move_snake(&mut snake, &direction, width, height);
         draw_fruit(fruit, &mut stdout);
@@ -71,6 +71,7 @@ fn main() {
             if is_fruit_was_eaten(&snake, fruit) {
                 fruit = generate_fruit(&snake, width, height);
                 snake.push(*snake.get(snake.len()-1).unwrap());
+                points += 1;
             }
         } else {
             queue!(stdout, SetForegroundColor(Color::Red)).unwrap();
@@ -84,6 +85,15 @@ fn main() {
     }
 }
 
+fn write_points(width: u16, points: u32, stdout: &mut Stdout) {
+    let label = format!("Points: {points}");
+    let label_x = width as usize / 2 - label.len() / 2;
+    queue!(*stdout, cursor::MoveTo(label_x as u16, 0));
+    stdout.write(label.as_bytes()).unwrap();
+    queue!(*stdout, cursor::MoveTo(0, 1)).unwrap();
+    stdout.write("=".repeat(width as usize).as_bytes()).unwrap();
+}
+
 fn is_fruit_was_eaten(snake: &Vec<(u16, u16)>, fruit: (u16, u16)) -> bool {
     let (x, y) = snake.get(0).unwrap();
     if fruit.0 == *x && fruit.1 == *y {
@@ -93,10 +103,10 @@ fn is_fruit_was_eaten(snake: &Vec<(u16, u16)>, fruit: (u16, u16)) -> bool {
 
 fn generate_fruit(snake: &Vec<(u16, u16)>, width: u16, height: u16) -> (u16, u16) {
     let mut rng = rand::rng();
-    let mut fruit: (u16, u16) = (rng.random_range(1..width), rng.random_range(1..height));
+    let mut fruit: (u16, u16) = (rng.random_range(2..width), rng.random_range(2..height));
     
     while snake.contains(&fruit) {
-        fruit = (rng.random_range(1..width-1), rng.random_range(1..height));
+        fruit = (rng.random_range(3..width-1), rng.random_range(3..height));
     }
     return fruit;
 }
@@ -120,7 +130,7 @@ fn move_snake(snake: &mut  Vec<(u16, u16)>, direction: &Direction, width: u16, h
     let new_x = (*head_x as i32 + direction.x as i32) as u16;
     let new_y = (*head_y as i32 + direction.y as i32) as u16;
     let is_snake_in_bounds =
-        new_x < width && new_y < height;
+        new_y > 1 && new_x < width && new_y < height;
 
     if is_snake_in_bounds && is_snake_not_in_self(snake, new_x, new_y) {
         snake[0] = (new_x, new_y);
