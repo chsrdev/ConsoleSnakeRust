@@ -1,10 +1,11 @@
 use std::thread;
 use std::io::{Write, stdout, Stdout};
+use std::time::Duration;
 use crossterm::{cursor, queue};
 use crossterm::terminal::{Clear, ClearType, size};
 use crossterm::event::{poll, read, Event, KeyCode};
 use crossterm::style::{SetForegroundColor, ResetColor, Color};
-use std::time::Duration;
+use rand::Rng;
 
 // ^ < ˅ >
 struct Direction {
@@ -18,29 +19,34 @@ const DIRECTION_DOWN: Direction = Direction{x: 0, y: 1, c: '˅'};
 const DIRECTION_LEFT: Direction = Direction{x: -1, y: 0, c: '<'};
 const DIRECTION_RIGHT: Direction = Direction{x: 1, y: 0, c: '>'};
 
-
 fn main() {
     let mut stdout = stdout();
-    queue!(stdout, Clear(ClearType::All)).unwrap();
-    let (w, h) = size().unwrap();
-    queue!(stdout, cursor::MoveTo(w/2-12, h/2)).unwrap();
-    stdout.flush().unwrap();
+    let (mut width, mut height) = size().unwrap();
 
-    let start_x = w / 3;
-    let start_y = h / 2;
+    let start_x = width / 3;
+    let start_y = height / 2;
     let mut snake = vec![(start_x, start_y)];
-    for dx in 1..=5 {
+
+    for dx in 1..=5 { 
         snake.push((start_x - dx, start_y));
     }
-    let mut direction: Direction = DIRECTION_RIGHT;
 
-    draw_snake(&snake, &direction,&mut stdout);
+    let mut direction: Direction = DIRECTION_RIGHT;
+    let mut fruit = generate_fruit(&snake, width, height);
+    dbg!(fruit);
+
+    queue!(stdout, Clear(ClearType::All)).unwrap();
+    draw_snake(&snake, &direction, &mut stdout);
+    draw_fruit(fruit, &mut stdout);
 
     'game_loop:
     loop {
         while poll(Duration::ZERO).unwrap() {
             match read().unwrap() {
-                Event::Resize(_, _) => break 'game_loop,
+                Event::Resize(w, h) => {
+                    width = w;
+                    height = h;
+                },
                 Event::Key(event) => {
                     if let KeyCode::Char(c) = event.code {
                         match c {
@@ -58,9 +64,14 @@ fn main() {
 
         queue!(stdout, Clear(ClearType::All)).unwrap();
 
-        let snake_move_result = move_snake(&mut snake, &direction, w, h);
+        let snake_move_result = move_snake(&mut snake, &direction, width, height);
+        draw_fruit(fruit, &mut stdout);
         if snake_move_result.1 {
             draw_snake(&snake, &direction, &mut stdout);
+            if is_fruit_was_eaten(&snake, fruit) {
+                fruit = generate_fruit(&snake, width, height);
+                snake.push(*snake.get(snake.len()-1).unwrap());
+            }
         } else {
             queue!(stdout, SetForegroundColor(Color::Red)).unwrap();
             draw_snake(&snake_move_result.0, &direction, &mut stdout);
@@ -71,6 +82,23 @@ fn main() {
         stdout.flush().unwrap();
         thread::sleep(Duration::from_millis(100));
     }
+}
+
+fn is_fruit_was_eaten(snake: &Vec<(u16, u16)>, fruit: (u16, u16)) -> bool {
+    let (x, y) = snake.get(0).unwrap();
+    if fruit.0 == *x && fruit.1 == *y {
+        return true;
+    } return false;
+}
+
+fn generate_fruit(snake: &Vec<(u16, u16)>, width: u16, height: u16) -> (u16, u16) {
+    let mut rng = rand::rng();
+    let mut fruit: (u16, u16) = (rng.random_range(1..width), rng.random_range(1..height));
+    
+    while snake.contains(&fruit) {
+        fruit = (rng.random_range(1..width-1), rng.random_range(1..height));
+    }
+    return fruit;
 }
 
 fn is_snake_not_in_self(snake: &mut Vec<(u16, u16)>, head_x: u16, head_y: u16) -> bool {
@@ -112,4 +140,10 @@ fn draw_snake(snake: &Vec<(u16, u16)>, direction: &Direction, stdout: &mut Stdou
         queue!(*stdout, cursor::MoveTo(*x, *y)).unwrap();
         stdout.write("#".as_bytes()).unwrap();
     }
+}
+
+fn draw_fruit(fruit: (u16, u16), stdout: &mut Stdout) {
+    queue!(*stdout, SetForegroundColor(Color::Green), cursor::MoveTo(fruit.0, fruit.1)).unwrap();
+    stdout.write("o".as_bytes()).unwrap();
+    queue!(*stdout, ResetColor).unwrap();
 }
