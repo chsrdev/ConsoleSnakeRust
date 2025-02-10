@@ -1,9 +1,9 @@
 use std::thread;
 use std::io::{Write, stdout, Stdout};
-use crossterm::{ExecutableCommand, cursor, queue};
+use crossterm::{cursor, queue};
 use crossterm::terminal::{Clear, ClearType, size};
 use crossterm::event::{poll, read, Event, KeyCode};
-use crossterm::style::{Print, SetForegroundColor, ResetColor, Color, Attribute};
+use crossterm::style::{SetForegroundColor, ResetColor, Color};
 use std::time::Duration;
 
 // ^ < ˅ >
@@ -24,7 +24,6 @@ fn main() {
     queue!(stdout, Clear(ClearType::All)).unwrap();
     let (w, h) = size().unwrap();
     queue!(stdout, cursor::MoveTo(w/2-12, h/2)).unwrap();
-    stdout.write(format!("width: {}, height: {}", w, h).as_bytes()).unwrap();
     stdout.flush().unwrap();
 
     let start_x = w / 3;
@@ -33,7 +32,6 @@ fn main() {
     for dx in 1..=5 {
         snake.push((start_x - dx, start_y));
     }
-    // let mut direction: (i8, i8) = (1, 0);
     let mut direction: Direction = DIRECTION_RIGHT;
 
     draw_snake(&snake, &direction,&mut stdout);
@@ -42,7 +40,7 @@ fn main() {
     loop {
         while poll(Duration::ZERO).unwrap() {
             match read().unwrap() {
-                Event::Resize(x, y) => break 'game_loop,
+                Event::Resize(_, _) => break 'game_loop,
                 Event::Key(event) => {
                     if let KeyCode::Char(c) = event.code {
                         match c {
@@ -64,13 +62,13 @@ fn main() {
         if snake_move_result.1 {
             draw_snake(&snake, &direction, &mut stdout);
         } else {
-            queue!(stdout, SetForegroundColor(Color::Red));
+            queue!(stdout, SetForegroundColor(Color::Red)).unwrap();
             draw_snake(&snake_move_result.0, &direction, &mut stdout);
-            queue!(stdout, ResetColor);
+            queue!(stdout, ResetColor).unwrap();
             break 'game_loop;
         }
 
-        stdout.flush();
+        stdout.flush().unwrap();
         thread::sleep(Duration::from_millis(100));
     }
 }
@@ -94,7 +92,7 @@ fn move_snake(snake: &mut  Vec<(u16, u16)>, direction: &Direction, width: u16, h
     let new_x = (*head_x as i32 + direction.x as i32) as u16;
     let new_y = (*head_y as i32 + direction.y as i32) as u16;
     let is_snake_in_bounds =
-        new_x >= 0 && new_y >= 0 && new_x < width && new_y < height;
+        new_x < width && new_y < height;
 
     if is_snake_in_bounds && is_snake_not_in_self(snake, new_x, new_y) {
         snake[0] = (new_x, new_y);
