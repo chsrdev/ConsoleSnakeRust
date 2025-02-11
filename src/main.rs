@@ -62,7 +62,7 @@ fn main() {
         }
 
         queue!(stdout, Clear(ClearType::All)).unwrap();
-        write_points(width, points, &mut stdout);
+        write_points(width, height, points, &mut stdout);
 
         let snake_move_result = move_snake(&mut snake, &direction, width, height);
         draw_fruit(fruit, &mut stdout);
@@ -80,17 +80,20 @@ fn main() {
             break 'game_loop;
         }
 
+        queue!(stdout, cursor::MoveTo(0, height)).unwrap();
         stdout.flush().unwrap();
         thread::sleep(Duration::from_millis(100));
     }
 }
 
-fn write_points(width: u16, points: u32, stdout: &mut Stdout) {
+fn write_points(width: u16, height: u16, points: u32, stdout: &mut Stdout) {
     let label = format!("Points: {points}");
     let label_x = width as usize / 2 - label.len() / 2;
     queue!(*stdout, cursor::MoveTo(label_x as u16, 0));
     stdout.write(label.as_bytes()).unwrap();
     queue!(*stdout, cursor::MoveTo(0, 1)).unwrap();
+    stdout.write("=".repeat(width as usize).as_bytes()).unwrap();
+    queue!(*stdout, cursor::MoveTo(0, height)).unwrap();
     stdout.write("=".repeat(width as usize).as_bytes()).unwrap();
 }
 
@@ -103,10 +106,10 @@ fn is_fruit_was_eaten(snake: &Vec<(u16, u16)>, fruit: (u16, u16)) -> bool {
 
 fn generate_fruit(snake: &Vec<(u16, u16)>, width: u16, height: u16) -> (u16, u16) {
     let mut rng = rand::rng();
-    let mut fruit: (u16, u16) = (rng.random_range(2..width), rng.random_range(2..height));
+    let mut fruit: (u16, u16) = (rng.random_range(2..width), rng.random_range(2..height-1));
     
     while snake.contains(&fruit) {
-        fruit = (rng.random_range(3..width-1), rng.random_range(3..height));
+        fruit = (rng.random_range(3..width-1), rng.random_range(3..height-1));
     }
     return fruit;
 }
@@ -130,7 +133,7 @@ fn move_snake(snake: &mut  Vec<(u16, u16)>, direction: &Direction, width: u16, h
     let new_x = (*head_x as i32 + direction.x as i32) as u16;
     let new_y = (*head_y as i32 + direction.y as i32) as u16;
     let is_snake_in_bounds =
-        new_y > 1 && new_x < width && new_y < height;
+        new_y > 1 && new_x < width && new_y < height-1;
 
     if is_snake_in_bounds && is_snake_not_in_self(snake, new_x, new_y) {
         snake[0] = (new_x, new_y);
